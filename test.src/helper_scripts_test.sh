@@ -115,6 +115,13 @@ with open(sys.argv[1]) as f: compile(f.read(), sys.argv[1], "exec")' \
     "$B/attack"
 check "attack compiles with warnings as errors" "$T/out" ""
 
+# gvizify: turns 'prooftrans xml' output into a graphviz digraph.
+$TIMEOUT_CMD "$B/prover9" -f "$T/x2.in" < /dev/null 2> /dev/null |
+  "$B/prooftrans" xml > "$T/proof.xml"
+run "$B/gvizify" proof.xml
+check "gvizify proof.xml (header)" "$T/out" '^strict digraph "proof"'
+check "gvizify proof.xml (whole graph)" "$T/out" "last step is plausible root"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
