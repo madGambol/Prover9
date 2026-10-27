@@ -178,9 +178,62 @@ FILE *distinctness_axioms(void)
  *
  *************/
 
+/* TPTP's include has an optional second argument, a list of formula
+ * names:
+ *
+ *     include('Axioms/FOO.ax').              the whole file
+ *     include('Axioms/FOO.ax',[ia1,ia3]).    only the named formulas
+ *
+ * (and "*" for the whole file).  A selection applies to every formula the
+ * included file yields, including those from files it includes in turn,
+ * so when includes nest, a formula is kept only if every enclosing
+ * selection names it, as in tptp4X.  <selections> is the list of
+ * enclosing name lists, innermost first, or NULL for no selection.
+ */
+
+/* TPTP's 'abc' and abc are the same name. */
+
+static
+BOOL same_tptp_name(Term a, Term b)
+{
+  char *s, *t;
+  int m, n;
+
+  if (!CONSTANT(a) || !CONSTANT(b))
+    return term_ident(a, b);
+  s = sn_to_str(SYMNUM(a));
+  t = sn_to_str(SYMNUM(b));
+  m = strlen(s);
+  n = strlen(t);
+  if (m >= 2 && s[0] == '\'' && s[m-1] == '\'') {
+    s++;
+    m -= 2;
+  }
+  if (n >= 2 && t[0] == '\'' && t[n-1] == '\'') {
+    t++;
+    n -= 2;
+  }
+  return m == n && strncmp(s, t, m) == 0;
+}  /* same_tptp_name */
+
+static
+BOOL name_selected(Term name, Plist selections)
+{
+  Plist s;
+  for (s = selections; s != NULL; s = s->next) {
+    Term names = s->v;
+    while (cons_term(names) && !same_tptp_name(ARG(names,0), name))
+      names = ARG(names,1);
+    if (!cons_term(names))
+      return FALSE;
+  }
+  return TRUE;
+}  /* name_selected */
+
 static
 void read_tptp_input(FILE *fin, FILE *fout, FILE *ferr,
-		     Plist *assumps, Plist *goals, int depth)
+		     Plist *assumps, Plist *goals, Plist selections,
+		     int depth)
 {
   Term t = read_term(fin, fout);
 
@@ -190,9 +243,19 @@ void read_tptp_input(FILE *fin, FILE *fout, FILE *ferr,
       char *fname = new_str_copy(sn_to_str(SYMNUM(ARG(t,0))));
       char *fname2 = fname;
       FILE *fin2;
+      Plist sels = selections;
 
       if (depth >= 20)
 	fatal_error("read_tptp_input: include depth limit (20) exceeded");
+
+      if (is_term(t, "include", 2) && !is_term(ARG(t,1), "*", 0)) {
+	if (!proper_listterm(ARG(t,1))) {
+	  p_term(t);
+	  fatal_error("read_tptp_input: the selection in an include must be "
+		      "a list of formula names");
+	}
+	sels = plist_prepend(selections, ARG(t,1));
+      }
 
       if (*fname2 == '\'' || *fname2 == '"') {
 	fname2[strlen(fname2)-1] = '\0';
@@ -208,19 +271,23 @@ void read_tptp_input(FILE *fin, FILE *fout, FILE *ferr,
       {
 	FILE *rew = rewrite_distinct_objects(fin2);
 	fclose(fin2);
-	read_tptp_input(rew, fout, ferr, assumps, goals, depth + 1);
+	read_tptp_input(rew, fout, ferr, assumps, goals, sels, depth + 1);
 	fclose(rew);
       }
+      if (sels != selections)
+	free_plist(sels);
       safe_free(fname);
     }
     else if (is_term(t, "cnf", 3) || is_term(t, "cnf", 4) ||
 	     is_term(t, "fof", 3) || is_term(t, "fof", 4) ||
 	     is_term(t, "input_clause", 3)) {
-      Formula form = tptp_input_to_ladr_formula(t);
-      if (is_term(ARG(t,1), "conjecture", 0))
-	*goals = plist_prepend(*goals, form);
-      else
-	*assumps = plist_prepend(*assumps, form);
+      if (name_selected(ARG(t,0), selections)) {
+	Formula form = tptp_input_to_ladr_formula(t);
+	if (is_term(ARG(t,1), "conjecture", 0))
+	  *goals = plist_prepend(*goals, form);
+	else
+	  *assumps = plist_prepend(*assumps, form);
+      }
     }
     else {
       p_term(t);
@@ -252,7 +319,7 @@ int main(int argc, char **argv)
 
   {
     FILE *rew = rewrite_distinct_objects(stdin);
-    read_tptp_input(rew, stdout, stderr, &assumps, &goals, 0);
+    read_tptp_input(rew, stdout, stderr, &assumps, &goals, NULL, 0);
     fclose(rew);
   }
 
@@ -270,7 +337,7 @@ int main(int argc, char **argv)
 	   Distinct_count, (Distinct_count * (Distinct_count - 1)) / 2);
     if (Distinct_count > 1) {
       FILE *ax = distinctness_axioms();
-      read_tptp_input(ax, stdout, stderr, &assumps, &goals, 0);
+      read_tptp_input(ax, stdout, stderr, &assumps, &goals, NULL, 0);
       fclose(ax);
     }
   }

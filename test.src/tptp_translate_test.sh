@@ -35,6 +35,12 @@ mkdir "$W" || exit 2
 trap 'rm -rf "$W"' 0
 trap 'exit 1' 1 2 15
 
+# tptp_to_ladr resolves an include() from the current directory, and the
+# native reader relative to the including file and then under $TPTP.
+# With both at $W, the same inputs work for both readers.
+TPTP="$W"
+export TPTP
+
 pass=0
 fail=0
 
@@ -108,6 +114,12 @@ native() {
   result "$1" "$3" "$got"
 }
 
+# native_fof DESC FILE.p STATUS -- fof-prover9 (the same reader)
+native_fof() {
+  got=$(cd "$W" && $TIMEOUT_CMD "$BIN/fof-prover9" -t 5 "$2" < /dev/null 2>&1 | szs)
+  result "$1" "$3" "$got"
+}
+
 # native_mace4 DESC FILE.p STATUS -- mace4's TPTP mode (the same reader)
 native_mace4() {
   got=$(cd "$W" && $TIMEOUT_CMD "$BIN/mace4" -tptp -t 5 -N 6 \
@@ -174,6 +186,55 @@ native "T6d native: \"Apple\" != \"Microsoft\""       do.p      Theorem
 native "T6e native: \"a\" != cat does not follow"     dc.p      GaveUp
 native_mace4 "T6f mace4 -tptp: \"a\" != cat"          dc.p      CounterSatisfiable
 native "T6g native: in an included file"           doinc.p   Theorem
+
+# T7: include('file', [names]) includes only the named formulas.  Both
+# readers ignored the list and took the whole file, which can make a
+# conjecture provable from an axiom the problem had excluded.  A
+# selection applies to everything the file yields, including what it
+# includes in turn, so nested selections intersect (as in tptp4X); and
+# 'i1' and i1 are the same name.
+mk ax/M.ax    'fof(i1,axiom, p(a) ).' \
+              'fof(i2,axiom, q(b) ).' \
+              'fof(i3,axiom, r(c) ).'
+mk ax/N.ax    "include('ax/M.ax',[i1,i2])." \
+              'fof(n1,axiom, s(d) ).'
+mk ax/N2.ax   "include('ax/M.ax')." \
+              'fof(n1,axiom, s(d) ).'
+mk selr.p     "include('ax/M.ax',[i1,i3])." 'fof(g,conjecture, r(c) ).'
+mk selq.p     "include('ax/M.ax',[i1,i3])." 'fof(g,conjecture, q(b) ).'
+mk allq.p     "include('ax/M.ax')."         'fof(g,conjecture, q(b) ).'
+mk starq.p    "include('ax/M.ax',*)."       'fof(g,conjecture, q(b) ).'
+mk emptyq.p   "include('ax/M.ax',[])."      'fof(g,conjecture, q(b) ).'
+mk qselq.p    "include('ax/M.ax',['i1','i3'])." 'fof(g,conjecture, q(b) ).'
+mk qselr.p    "include('ax/M.ax',['i3'])."  'fof(g,conjecture, r(c) ).'
+mk nestqs.p   "include('ax/N.ax',[i2,n1])." 'fof(g,conjecture, q(b) & s(d) ).'
+mk nestp.p    "include('ax/N.ax',[i2,n1])." 'fof(g,conjecture, p(a) ).'
+mk nestr.p    "include('ax/N.ax',[i3])."    'fof(g,conjecture, r(c) ).'
+mk nests.p    "include('ax/N2.ax',[i2])."   'fof(g,conjecture, s(d) ).'
+ladr   "T7a selected formula is kept"              selr.p    max_proofs
+ladr   "T7b excluded formula is dropped (unsound)" selq.p    sos_empty
+ladr   "T7c control: include/1 takes all"          allq.p    max_proofs
+ladr   "T7d control: '*' takes all"                starq.p   max_proofs
+ladr   "T7e empty selection takes nothing"         emptyq.p  sos_empty
+ladr   "T7f quoted names: excluded is dropped"     qselq.p   sos_empty
+ladr   "T7g quoted names: selected is kept"        qselr.p   max_proofs
+ladr   "T7h nested: kept by both selections"       nestqs.p  max_proofs
+ladr   "T7i nested: dropped by the outer one"      nestp.p   sos_empty
+ladr   "T7j nested: dropped by the inner one"      nestr.p   sos_empty
+ladr   "T7k nested include/1, outer selection"     nests.p   sos_empty
+native "T7l native: selected formula is kept"      selr.p    Theorem
+native "T7m native: excluded is dropped (unsound)" selq.p    GaveUp
+native_mace4 "T7n mace4 -tptp: excluded is dropped" selq.p   CounterSatisfiable
+native_fof   "T7o fof-prover9: excluded is dropped" selq.p   GaveUp
+native "T7p native: control: include/1 takes all"  allq.p    Theorem
+native "T7q native: empty selection takes nothing" emptyq.p  GaveUp
+native "T7r native: quoted names: excluded"        qselq.p   GaveUp
+native "T7s native: quoted names: selected"        qselr.p   Theorem
+native "T7t native: nested: kept by both"          nestqs.p  Theorem
+native "T7u native: nested: dropped by outer"      nestp.p   GaveUp
+native "T7v native: nested: dropped by inner"      nestr.p   GaveUp
+native "T7w native: nested include/1, outer sel."  nests.p   GaveUp
+native_mace4 "T7x mace4 -tptp: nested, dropped"    nestp.p   CounterSatisfiable
 
 # T8: NAND ("~&") and NOR ("~|").  The conversion code has always been
 # there, but the parser was never told the operators exist, so every
