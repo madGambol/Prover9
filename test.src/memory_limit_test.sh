@@ -21,11 +21,12 @@ fi
 
 # A build without these fixes can try to take many gigabytes, so cap
 # the address space of every run at 1 GB where the system allows it.
-# Each input also sets max_seconds, which bounds a run where it does not.
+# Each input also sets max_seconds or max_given, which bound a run
+# where the cap is not available.
 VMEM=1000000
 if ! (ulimit -v $VMEM) 2>/dev/null; then
   echo "Note: 'ulimit -v' is not available here -- running without the" >&2
-  echo "address-space cap (relying on each input's max_seconds instead)." >&2
+  echo "address-space cap (relying on each input's own limits instead)." >&2
   VMEM=""
 fi
 
@@ -114,6 +115,25 @@ check "mace4: ground clauses larger than max_megs" 7 "exit (max_megs_no)" \
 # parent must report max_megs, not that the sizes were exhausted.
 check "mace4 -cores 4: ground clauses larger than max_megs" 7 "exit (max_megs_no)" \
   "$BIN/mace4" -cores 4 -n 8 -N 11 -f "$TMP/ground.in"
+
+# get_mem() takes chunks of 500 pointers or more from safe_malloc(),
+# not palloc(), so they must be counted too.  Each clause kept here
+# holds f(x,x,...,x) with 900 arguments, a 7 KB argument array (the
+# variable itself is shared).  By max_given 6000 that is about 85 MB
+# of such chunks on top of about 180 MB from palloc().
+cat > "$TMP/wide.in" <<END
+assign(max_megs, 220).
+assign(max_given, 6000).
+assign(max_weight, 1000000).
+assign(fpa_depth, 1).
+formulas(sos).
+p(f(x$(awk 'BEGIN { for (i = 1; i < 900; i++) printf ",x" }')), a).
+-p(x, y) | p(x, s0(y)).
+-p(x, y) | p(x, s1(y)).
+end_of_list.
+END
+check "prover9: large get_mem() chunks count toward max_megs" 3 "exit (max_megs)" \
+  "$BIN/prover9" -f "$TMP/wide.in"
 
 echo
 echo "$pass passed, $fail failed"
