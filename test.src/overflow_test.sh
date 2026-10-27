@@ -52,6 +52,14 @@ end_of_list.
 END
 $TIMEOUT_CMD "$BIN/prover9" -f "$TMP/x2.in" > "$TMP/proof" 2>/dev/null
 
+# The same proof with its first clause id replaced by a 200,000-char token.
+awk '/= PROOF =/ { p = 1 }
+     p && /^[0-9]+ / {
+       t = "x"; while (length(t) < 200000) t = t t
+       sub(/^[0-9]+/, substr(t, 1, 200000)); p = 0
+     }
+     { print }' "$TMP/proof" > "$TMP/longtok"
+
 pass=0
 fail=0
 
@@ -94,6 +102,12 @@ check "prooftrans hints -label <300 chars>" 0 \
   "${LONG}_1" "$TMP/proof" "$BIN/prooftrans" hints -label "$LONG"
 check "prooftrans hints -label <300 chars, quoted>" 0 \
   "\"a-${LONG}_1\"" "$TMP/proof" "$BIN/prooftrans" hints -label "a-$LONG"
+
+# D2: proof tokens were read with fscanf("%s") into char[1000].
+for prog in prooftrans directproof; do
+  check "$prog < proof with a 200,000-char clause id" 1 \
+    "Fatal error" "$TMP/longtok" "$BIN/$prog"
+done
 
 echo
 echo "$pass passed, $fail failed"

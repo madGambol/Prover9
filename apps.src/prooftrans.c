@@ -44,6 +44,15 @@ enum {ORDINARY, PARENTS_ONLY, XML, HINTS, IVY, TAGGED, TSTP};  /* output format 
 
 #define BUF_MAX 1000
 
+/* fscanf's "%s" has no bound of its own, so the proof tokens (a "%" or a
+   clause id) are read with a field width of BUF_MAX, into a buffer of
+   BUF_MAX+1 to leave room for the NUL.  A longer token is malformed
+   input, which the parsing below rejects. */
+
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x)  STRINGIFY_(x)
+#define TOKEN_FMT     "%" STRINGIFY(BUF_MAX) "s"
+
 /*************
  *
  *   read_heading()
@@ -447,11 +456,11 @@ int main(int argc, char **argv)
     /* ok, we have a proof */
     String_buf comment = get_string_buf();
 
-    char s[BUF_MAX];
+    char s[BUF_MAX+1];  /* +1: TOKEN_FMT's width is BUF_MAX */
     Plist proof = NULL;
     number_of_proofs++;
 
-    if (fscanf(fin, "%s", s) < 1) s[0] = '\0';  /* "%" or clause id */
+    if (fscanf(fin, TOKEN_FMT, s) < 1) s[0] = '\0';  /* "%" or clause id */
     while (str_ident(s, "%")) {
       if (!fgets(s, BUF_MAX, fin)) s[0] = '\0';
       /* in case prooftrans is run multiple times */
@@ -467,7 +476,7 @@ int main(int argc, char **argv)
 	  sb_append_char(comment, c);
 	} while (c != '\n');
       }
-      if (fscanf(fin, "%s", s) < 1) s[0] = '\0';  /* "%" or clause id */
+      if (fscanf(fin, TOKEN_FMT, s) < 1) s[0] = '\0';  /* "%" or clause id */
     }
 
     while (!substring("==========", s)) {  /* separator at end of proof */
@@ -494,7 +503,7 @@ int main(int argc, char **argv)
 	register_clause_with_id(cl);
       proof = plist_prepend(proof, cl);
 
-      if (fscanf(fin, "%s", s) < 1) s[0] = '\0';  /* clause id */
+      if (fscanf(fin, TOKEN_FMT, s) < 1) s[0] = '\0';  /* clause id */
     }
     proof = reverse_plist(proof);
     proofs = plist_append(proofs, proof);
