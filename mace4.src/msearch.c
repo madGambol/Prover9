@@ -72,6 +72,12 @@ struct cell *Cells;           /* the table of cells (dynamically allocated) */
 struct cell **Ordered_cells;  /* (pointers to) permutation of Cells */
 int First_skolem_cell;
 
+/* Megabytes in the cell table for the current domain size.  It comes
+   from safe_malloc(), not palloc(), so megs_malloced() cannot see it;
+   mace_megs() adds it in. */
+
+static int Table_megs = 0;
+
 /* Misc Variables*/
 
 int Domain_size;
@@ -503,6 +509,57 @@ void initialize_for_search(Plist clauses)
 
 /*************
  *
+ *   table_mult()
+ *
+ *   a * b, saturating at TABLE_BYTES_MAX, for sizing tables that may be
+ *   far too large to allocate.
+ *
+ *************/
+
+#define TABLE_BYTES_MAX ((unsigned long long) 1 << 62)
+
+static
+unsigned long long table_mult(unsigned long long a, unsigned long long b)
+{
+  if (b != 0 && a > TABLE_BYTES_MAX / b)
+    return TABLE_BYTES_MAX;
+  else
+    return a * b;
+}  /* table_mult */
+
+/*************
+ *
+ *   cell_table_bytes()
+ *
+ *   How much init_for_domain_size() will safe_malloc() for the cell
+ *   table: each cell, its place in Ordered_cells, and its possible[]
+ *   array.  The symbol bases must already be set.
+ *
+ *************/
+
+static
+unsigned long long cell_table_bytes(void)
+{
+  unsigned long long bytes = 0;
+  Symbol_data s;
+
+  for (s = Symbols; s != NULL; s = s->next) {
+    unsigned long long cells = int_power(Domain_size, s->arity);
+    unsigned long long values = (s->type == RELATION ? 2 : Domain_size);
+    unsigned long long per_cell = (sizeof(struct cell) +
+				   sizeof(struct cell *) +
+				   table_mult(values, sizeof(Term)));
+    bytes += table_mult(cells, per_cell);
+    if (bytes > TABLE_BYTES_MAX)
+      bytes = TABLE_BYTES_MAX;
+  }
+  return bytes;
+}  /* cell_table_bytes */
+
+static int mace_megs(void);
+
+/*************
+ *
  *   init_for_domain_size()
  *
  *   Given the list of (general) clauses, set up the various data
@@ -510,11 +567,15 @@ void initialize_for_search(Plist clauses)
  *
  *************/
 
-/* Returns TRUE on success, FALSE if cells overflow (domain too large). */
+/* Returns SEARCH_GO_NO_MODELS on success.  Otherwise nothing has been
+   allocated, and it returns SEARCH_CELLS_OVERFLOW if the cell ids would
+   not fit in an int, or SEARCH_MAX_MEGS if the tables would exceed
+   max_megs.  Larger domain sizes need more, so both stop the search. */
 static
-BOOL init_for_domain_size(void)
+int init_for_domain_size(void)
 {
   int i, j, nextbase, id;
+  unsigned long long bytes;
   Symbol_data s;
 
   /* Give each symbol its "base" value, which is used to index cells.  */
@@ -527,11 +588,25 @@ BOOL init_for_domain_size(void)
               "\n%% Mace4: too many cells for domain size %d "
               "(symbol %s/%d, arity too high)\n",
               Domain_size, sn_to_str(s->sn), s->arity);
-      return FALSE;
+      return SEARCH_CELLS_OVERFLOW;
     }
     s->base = nextbase;
     nextbase += cells;
   }
+
+  /* The table comes from safe_malloc(), not palloc(), so neither
+     max_megs check could see it.  Check it before allocating it. */
+
+  bytes = cell_table_bytes();
+  if (parm(Opt->max_megs) != -1 &&
+      mace_megs() + (long long) (bytes / (1024*1024)) > parm(Opt->max_megs)) {
+    fprintf(stderr,
+            "\n%% Mace4: domain size %d needs %llu megabytes for the "
+            "cell table, over max_megs (%d)\n",
+            Domain_size, bytes / (1024*1024), parm(Opt->max_megs));
+    return SEARCH_MAX_MEGS;
+  }
+  Table_megs = (int) (bytes / (1024*1024));
 
   /* Set up the array of domain terms.  All ground terms refer to these. */
 
@@ -564,7 +639,7 @@ BOOL init_for_domain_size(void)
   
   if (flag(Opt->negprop))
     init_negprop_index();
-  return TRUE;
+  return SEARCH_GO_NO_MODELS;
 } /* init_for_domain_size */
 
 /*************
@@ -754,7 +829,8 @@ int possible_model(void)
 static
 int mace_megs(void)
 {
-  return (megs_malloced() - Start_megs) + (estack_bytes() / (1024*1024));
+  return (megs_malloced() - Start_megs) + (estack_bytes() / (1024*1024))
+    + Table_megs;
 }  /* mace_megs */
 
 /*************
@@ -1339,8 +1415,9 @@ int mace4n(Plist clauses, int order)
 
   Domain_size = order;
 
-  if (!init_for_domain_size())
-    return SEARCH_CELLS_OVERFLOW;  /* cells overflow - stop iterating */
+  rc = init_for_domain_size();
+  if (rc != SEARCH_GO_NO_MODELS)
+    return rc;  /* cells overflow or max_megs - stop iterating */
 
   built_in_assignments();  /* Fill out equality table (and maybe others). */
 
@@ -1403,6 +1480,7 @@ int mace4n(Plist clauses, int order)
   }
   safe_free(Cells);
   Cells = NULL;
+  Table_megs = 0;
 
   for (i = 0; i < Domain_size; i++)
     zap_term(Domain[i]);
@@ -1937,8 +2015,9 @@ int mace4n_resume(Plist clauses, int order,
   }
 
   Domain_size = order;
-  if (!init_for_domain_size())
-    return SEARCH_CELLS_OVERFLOW;
+  rc = init_for_domain_size();
+  if (rc != SEARCH_GO_NO_MODELS)
+    return rc;
   built_in_assignments();
   special_assignments();
 
@@ -2017,6 +2096,7 @@ int mace4n_resume(Plist clauses, int order,
   }
   safe_free(Cells);
   Cells = NULL;
+  Table_megs = 0;
 
   for (i = 0; i < Domain_size; i++)
     zap_term(Domain[i]);

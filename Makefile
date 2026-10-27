@@ -103,6 +103,13 @@ test12:
 	@test.src/option_parsing_test.sh bin/prover9
 	@echo ""
 	@echo "**** Option-dependency checks. ****"
+	@echo "**** Next try 'make test13'. ****"
+	@echo ""
+
+test13:
+	@test.src/memory_limit_test.sh bin
+	@echo ""
+	@echo "**** max_megs regression cases. ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""
