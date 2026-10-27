@@ -81,6 +81,17 @@ EOF
 run "$B/prover9-mace4" -f x2.in < /dev/null
 check "prover9-mace4 -f x2.in (Prover9 wins)" "$T/out" "THEOREM PROVED"
 
+# looper: appends each candidate line to a head file and runs Prover9
+# (as a goal) or Mace4 (as an assumption) on it.
+sed '/formulas(goals)/,$d' "$T/x2.in" > "$T/head.in"
+echo 'x * y = y * x.' > "$T/cands.txt"
+run "$B/looper" prover9 goals head.in < "$T/cands.txt"
+check "looper prover9 goals (proves the candidate)" "$T/out" \
+      "processed 1, successes 1, failures 0"
+run "$B/looper" mace4 assumptions head.in < "$T/cands.txt"
+check "looper mace4 assumptions (finds a model)" "$T/out" \
+      "processed 1, successes 1, failures 0"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
