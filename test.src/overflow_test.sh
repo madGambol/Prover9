@@ -109,6 +109,19 @@ for prog in prooftrans directproof; do
     "Fatal error" "$TMP/longtok" "$BIN/$prog"
 done
 
+# M4: an unknown kbo_weights symbol was reported through char[200].
+cat > "$TMP/kbo.in" <<END
+assign(order, kbo).
+list(kbo_weights).
+  $LONG = 3.
+end_of_list.
+formulas(goals).
+  p(a) -> p(a).
+end_of_list.
+END
+check "prover9 kbo_weights with a 300-char unknown symbol" 1 \
+  "init_kbo_weights, symbol $LONG not found" /dev/null "$BIN/prover9" -f "$TMP/kbo.in"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
