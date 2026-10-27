@@ -82,6 +82,13 @@ test9:
 	@test.src/overflow_test.sh bin
 	@echo ""
 	@echo "**** Long-argument and long-token overflow regressions. ****"
+	@echo "**** Next try 'make test10'. ****"
+	@echo ""
+
+test10:
+	@test.src/truncated_proof_test.sh bin
+	@echo ""
+	@echo "**** Truncated-proof regressions for prooftrans and directproof. ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""

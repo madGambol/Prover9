@@ -469,12 +469,13 @@ int main(int argc, char **argv)
 	sb_append(comment, s);
       }
       /* in case there are any long comment lines (answers) */
-      if (s[strlen(s)] != '\n') {
-	char c;
-	do {
-	  c = fgetc(fin);
+      if (s[0] != '\0' && s[strlen(s)-1] != '\n') {
+	int c;  /* int, so that EOF is not mistaken for a char */
+	while ((c = fgetc(fin)) != EOF) {
 	  sb_append_char(comment, c);
-	} while (c != '\n');
+	  if (c == '\n')
+	    break;
+	}
       }
       if (fscanf(fin, TOKEN_FMT, s) < 1) s[0] = '\0';  /* "%" or clause id */
     }
@@ -486,6 +487,8 @@ int main(int argc, char **argv)
       BOOL is_fof;
       Topform cl;
 
+      if (clause_term == NULL || just_term == NULL)
+	fatal_error("proof ends prematurely (truncated input?)");
       is_fof = (output_format == TSTP &&
                 term_has_non_clause_label(clause_term));
       cl = is_fof ? term_to_topform(clause_term, TRUE)

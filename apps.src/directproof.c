@@ -717,12 +717,13 @@ int main(int argc, char **argv)
 	sb_append(comment, s);
       }
       /* in case there are any long comment lines (answers) */
-      if (s[strlen(s)] != '\n') {
-	char c;
-	do {
-	  c = fgetc(fin);
+      if (s[0] != '\0' && s[strlen(s)-1] != '\n') {
+	int c;  /* int, so that EOF is not mistaken for a char */
+	while ((c = fgetc(fin)) != EOF) {
 	  sb_append_char(comment, c);
-	} while (c != '\n');
+	  if (c == '\n')
+	    break;
+	}
       }
       if (fscanf(fin, TOKEN_FMT, s) < 1) s[0] = '\0';  /* "%" or clause id */
     }
@@ -731,7 +732,10 @@ int main(int argc, char **argv)
       Term clause_term = read_term(fin, stderr);
       Term just_term = read_term(fin, stderr);
       int id;
-      Topform cl = term_to_clause(clause_term);
+      Topform cl;
+      if (clause_term == NULL || just_term == NULL)
+	fatal_error("proof ends prematurely (truncated input?)");
+      cl = term_to_clause(clause_term);
       clause_set_variables(cl, MAX_VARS);
       cl->justification = term_to_just(just_term);
       if (str_to_int(s, &id))
