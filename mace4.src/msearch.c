@@ -390,6 +390,40 @@ void mace4_exit(int exit_code)
 
 /*************
  *
+ *   mace4_max_megs_exit()
+ *
+ *   LADR's memory package calls this when an allocation would go past
+ *   max_megs.  Mace4's own check, in check_time_memory(), runs only
+ *   during the search; this one also covers the work before it, such
+ *   as generate_ground_clauses().
+ *
+ *************/
+
+static
+void mace4_max_megs_exit(void)
+{
+  static BOOL in_handler = FALSE;
+  int code = (Total_models == 0 ? MAX_MEGS_NO_EXIT : MAX_MEGS_YES_EXIT);
+
+  /* We are inside the allocator, and reporting allocates.  Disarm the
+     check first, and if we get here again anyway, just leave. */
+  if (in_handler)
+    _Exit(code);
+  in_handler = TRUE;
+  disable_max_megs();
+
+  fprintf(stderr, "\n%% Mace4: max_megs exceeded at domain size %d\n",
+	  Domain_size);
+  if (Mace4_cores_child) {
+    /* The -cores parent reads the exit code and owns the status. */
+    fflush(stdout);
+    _Exit(code);
+  }
+  mace4_exit(code);
+}  /* mace4_max_megs_exit */
+
+/*************
+ *
  *   new_uncached_bool_term()
  *
  *   Construct a fresh VARIABLE-shaped term with the given VARNUM,
@@ -1646,7 +1680,11 @@ Mace_results mace4(Plist clauses, Mace_options opt)
   int n, rc;
   Mace_results results = safe_malloc(sizeof(struct mace_results));
 
-  disable_max_megs();  /* mace4 does its own max_megs check */
+  /* Mace4 does its own max_megs check, which also counts the estack and
+     the cell tables, but only during the search.  Keep LADR's check on
+     as well, so that building the ground clauses is bounded too. */
+  set_max_megs(parm(opt->max_megs));  /* opt: Opt is not set yet */
+  set_max_megs_proc(mace4_max_megs_exit);
   Start_seconds = user_seconds();
   Start_megs = megs_malloced();
 

@@ -96,6 +96,25 @@ check "mace4: negprop index larger than max_megs" 7 "negprop index" \
 check "mace4: same input, clear(negprop) (control)" 0 "Exiting with 1 model" \
   "$BIN/mace4" -f "$TMP/no_negprop.in"
 
+# Mace4's own max_megs check runs only during the search, so LADR's
+# must stay on to bound the ground clauses built before it.  At domain
+# size 10 the first clause alone has 10^8 instances.
+cat > "$TMP/ground.in" <<'END'
+assign(max_megs, 20).
+assign(max_seconds, 5).
+formulas(sos).
+p(x1,x2) | p(x3,x4) | p(x5,x6) | p(x7,x8) | q(x1,x3,x5,x7).
+-p(x1,x2) | -q(x1,x2,x3,x4) | r(x3,x4).
+end_of_list.
+END
+check "mace4: ground clauses larger than max_megs" 7 "exit (max_megs_no)" \
+  "$BIN/mace4" -n 10 -N 10 -f "$TMP/ground.in"
+
+# The same with -cores: each child must stop at max_megs, and the
+# parent must report max_megs, not that the sizes were exhausted.
+check "mace4 -cores 4: ground clauses larger than max_megs" 7 "exit (max_megs_no)" \
+  "$BIN/mace4" -cores 4 -n 8 -N 11 -f "$TMP/ground.in"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
