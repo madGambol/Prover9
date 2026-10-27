@@ -89,6 +89,13 @@ test10:
 	@test.src/truncated_proof_test.sh bin
 	@echo ""
 	@echo "**** Truncated-proof regressions for prooftrans and directproof. ****"
+	@echo "**** Next try 'make test11'. ****"
+	@echo ""
+
+test11:
+	@test.src/memory_safety_test.sh bin/prover9
+	@echo ""
+	@echo "**** Memory-safety checks.  SKIP means the tool a case needs is unavailable. ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""
