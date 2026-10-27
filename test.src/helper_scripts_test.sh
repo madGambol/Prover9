@@ -50,10 +50,11 @@ run() {
 }
 
 # check DESC FILE PATTERN -- PASS if the last run exited 0 and FILE
-# contains PATTERN
+# contains PATTERN (an empty PATTERN checks the exit status only)
 check() {
   desc="$1"; file="$2"; pattern="$3"
-  if [ "$rc" -eq 0 ] && grep -e "$pattern" "$file" >/dev/null 2>&1; then
+  if [ "$rc" -eq 0 ] &&
+     { [ -z "$pattern" ] || grep -e "$pattern" "$file" >/dev/null 2>&1; }; then
     printf "  PASS  %s\n" "$desc"
     pass=$((pass+1))
   else
@@ -91,6 +92,28 @@ check "looper prover9 goals (proves the candidate)" "$T/out" \
 run "$B/looper" mace4 assumptions head.in < "$T/cands.txt"
 check "looper mace4 assumptions (finds a model)" "$T/out" \
       "processed 1, successes 1, failures 0"
+
+# attack: keeps the models Mace4 finds and drops each candidate that one
+# of them satisfies.  The first candidate needs Mace4; the model found
+# for it (x * y = 0) also satisfies the second.  Comments pass through.
+cat > "$T/semigroup.in" <<'EOF'
+assign(max_seconds, 10).
+formulas(assumptions).
+(x * y) * z = x * (y * z).
+end_of_list.
+EOF
+printf 'x * y = y * x.\n%% comment\nx * x = y * y.\n' > "$T/cands.txt"
+run "$B/attack" semigroup.in interps < "$T/cands.txt"
+check "attack semigroup.in interps (both candidates killed)" "$T/out" \
+      "checked 2, passed 0, num_interps 1"
+check "attack wrote the model to its interps file" "$T/interps" \
+      "interpretation("
+# Invalid escapes such as '\s' in a non-raw string are a SyntaxWarning
+# today and slated to become errors.
+run python3 -W error -c 'import sys
+with open(sys.argv[1]) as f: compile(f.read(), sys.argv[1], "exec")' \
+    "$B/attack"
+check "attack compiles with warnings as errors" "$T/out" ""
 
 echo
 echo "$pass passed, $fail failed"
