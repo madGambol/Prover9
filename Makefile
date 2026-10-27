@@ -75,6 +75,13 @@ test8:
 	@test.src/tptp_translate_test.sh bin
 	@echo ""
 	@echo "**** TPTP input regression matrix (tptp_to_ladr and native). ****"
+	@echo "**** Next try 'make test9'. ****"
+	@echo ""
+
+test9:
+	@test.src/overflow_test.sh bin
+	@echo ""
+	@echo "**** Long-argument and long-token overflow regressions. ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""
