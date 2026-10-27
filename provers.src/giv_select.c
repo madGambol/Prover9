@@ -98,6 +98,21 @@ void free_giv_select(Giv_select p)
 
 /*************
  *
+ *   add_parts()
+ *
+ *************/
+
+/* Parts are nonnegative, and a part can be INT_MAX ("take everything
+   from this selector first"), so a sum of parts saturates at INT_MAX. */
+
+static
+int add_parts(int a, int b)
+{
+  return (a > INT_MAX - b ? INT_MAX : a + b);
+}  /* add_parts */
+
+/*************
+ *
  *   current_cycle_size()
  *
  *************/
@@ -110,7 +125,7 @@ int current_cycle_size(Select_state s)
   for (p = s->selectors; p; p = p->next) {
     Giv_select gs = p->v;
     if (avl_size(gs->idx) > 0)
-      sum += gs->part;
+      sum = add_parts(sum, gs->part);
   }
   return sum;
 }  /* current_cycle_size */

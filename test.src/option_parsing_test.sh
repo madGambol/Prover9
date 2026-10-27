@@ -64,6 +64,40 @@ check "max_minutes 2 (control)"      "assign(max_minutes, 2)."      "assign(max_
 check "max_hours 3 (control)"        "assign(max_hours, 3)."        "assign(max_seconds, 10800)."
 check "pick_given_ratio 4 (control)" "assign(pick_given_ratio, 4)." "assign(weight_part, 4)."
 
+# A selector part of INT_MAX means "take everything from this selector
+# first".  The cycle size, the sum of the parts of the nonempty
+# selectors, overflowed when another selector also had clauses, and the
+# wrapped negative value made every new clause look about to be
+# selected, so sos_limit never deleted anything.
+
+desc="age_part 2147483647: sos_limit applies"
+out=$($TIMEOUT_CMD "$P9" 2>&1 <<'END'
+assign(age_part, 2147483647).
+assign(weight_part, 1).
+assign(false_part, 0).
+assign(true_part, 0).
+assign(sos_limit, 20).
+assign(max_given, 30).
+formulas(sos).
+  e * x = x.
+  x' * x = e.
+  (x * y) * z = x * (y * z).
+  x * x = e.
+end_of_list.
+END
+)
+deleted=$(printf '%s\n' "$out" | sed -n 's/.*Sos_limit_deleted=\([0-9]*\).*/\1/p')
+if [ "${deleted:-0}" -gt 0 ]; then
+  printf "  PASS  %-45s (Sos_limit_deleted=%s)\n" "$desc" "$deleted"
+  pass=$((pass+1))
+else
+  printf "  FAIL  %-45s expected Sos_limit_deleted > 0, got %s\n" \
+         "$desc" "${deleted:-<none>}"
+  printf '%s\n' "$out" | grep -e 'Fatal' -e 'runtime error' -e 'exit (' |
+    sed 's/^/        | /'
+  fail=$((fail+1))
+fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
