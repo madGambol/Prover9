@@ -20,6 +20,7 @@
 #include "semantics.h"
 #include "../ladr/avltree.h"
 #include "../ladr/clause_eval.h"
+#include <math.h>
 
 /* Private definitions and types */
 
@@ -573,18 +574,19 @@ BOOL sos_keep2(Topform c, Clist sos, Prover_options opt)
   if (sos_size < sos_limit / keep_factor)
     keep = TRUE;
   else {
-    int iters;
+    double iters;
     c->id = INT_MAX;
     iters = least_iters_to_selection(c, &Low, NULL);
     if (Debug)
-      printf("iters=%d, wt=%.3f\n", iters, c->weight);
+      printf("iters=%.0f, wt=%.3f\n", trunc(iters), c->weight);
     if (iters < sos_limit / keep_factor)
       keep = TRUE;
     else {
       if (c->weight < Low_water_keep) {
 	Low_water_keep = c->weight;
 	if (!flag(opt->quiet)) {
-	  printf("\nLow Water (keep): wt=%.3f, iters=%d\n", c->weight, iters);
+	  printf("\nLow Water (keep): wt=%.3f, iters=%.0f\n",
+		 c->weight, trunc(iters));
 	  if (stringparm(opt->stats, "all"))
 	    selector_report();
 	  fflush(stdout);
