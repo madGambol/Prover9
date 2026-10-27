@@ -91,6 +91,31 @@ else
   fi
 fi
 
+# zap_flatterm() tested "fi != f->end->next" on every iteration, after
+# the first iteration had freed f.  free_mem() keeps small blocks on its
+# own avail lists, so the stale read still sees the old contents and
+# neither valgrind nor ASan can report it.  zap_flatterm_test.c wraps
+# free_mem() to fill freed blocks with a bad address, which makes the
+# stale read crash.  That needs a linker with --wrap (GNU ld, lld), so
+# the case is skipped elsewhere, e.g. on macOS.
+
+desc="zap_flatterm: no read after free"
+dir=$(dirname "$0")
+if [ ! -f "$dir/../ladr/libladr.a" ]; then
+  skipped "$desc" "ladr/libladr.a not found; run 'make all' first"
+elif ! ${CC:-cc} -o "$TMP/zap_flatterm_test" "$dir/zap_flatterm_test.c" \
+       "$dir/../ladr/libladr.a" -Wl,--wrap=free_mem -lm >"$TMP/cc.log" 2>&1; then
+  skipped "$desc" "could not link with -Wl,--wrap=free_mem"
+else
+  out=$($TIMEOUT_CMD "$TMP/zap_flatterm_test" 2>&1)
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ "$out" = "zap_flatterm ok" ]; then
+    ok "$desc (poisoned free_mem)"
+  else
+    bad "$desc (poisoned free_mem)" "exit status $rc${out:+: $out}"
+  fi
+fi
+
 echo
 echo "$pass passed, $fail failed, $skip skipped"
 [ "$fail" -eq 0 ]
