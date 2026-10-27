@@ -34,6 +34,7 @@ repeat() {
 }
 
 LONG=$(repeat 300)
+LONG600=$(repeat 600)
 LONG4000=$(repeat 4000)
 
 pass=0
@@ -64,6 +65,14 @@ check "mace4 -f <300-char missing file>" 1 \
   "read_all_input, file $LONG not found" /dev/null "$BIN/mace4" -f "$LONG"
 check "prover9 -f <4000-char missing file>" 1 \
   "read_all_input, file $LONG4000 not found" /dev/null "$BIN/prover9" -f "$LONG4000"
+
+# M3: the same message, and mace4's -r checkpoint paths (char[512]).
+for prog in prooftrans directproof interpformat; do
+  check "$prog -f <300-char missing file>" 1 \
+    "file $LONG not found" /dev/null "$BIN/$prog" -f "$LONG"
+done
+check "mace4 -r <600-char missing directory>" 1 \
+  "cannot open $LONG600/saved_input.txt" /dev/null "$BIN/mace4" -r "$LONG600"
 
 echo
 echo "$pass passed, $fail failed"
