@@ -72,9 +72,9 @@ struct cell *Cells;           /* the table of cells (dynamically allocated) */
 struct cell **Ordered_cells;  /* (pointers to) permutation of Cells */
 int First_skolem_cell;
 
-/* Megabytes in the cell table for the current domain size.  It comes
-   from safe_malloc(), not palloc(), so megs_malloced() cannot see it;
-   mace_megs() adds it in. */
+/* Megabytes in the cell table and the negprop index for the current
+   domain size.  They come from safe_malloc(), not palloc(), so
+   megs_malloced() cannot see them; mace_megs() adds them in. */
 
 static int Table_megs = 0;
 
@@ -556,6 +556,46 @@ unsigned long long cell_table_bytes(void)
   return bytes;
 }  /* cell_table_bytes */
 
+/*************
+ *
+ *   negprop_index_bytes()
+ *
+ *   How much init_negprop_index() will safe_calloc().  For each value
+ *   of each symbol it builds a tree of depth arity whose nodes are
+ *   arrays of Domain_size+1 pointers, so it grows as
+ *   (Domain_size+1)^arity, faster than the cell table.
+ *
+ *************/
+
+static
+unsigned long long negprop_index_bytes(void)
+{
+  unsigned long long width = (unsigned long long) Domain_size + 1;
+  unsigned long long bytes = 0;
+  Symbol_data s;
+
+  for (s = Symbols; s != NULL; s = s->next) {
+    /* As in init_negprop_index(): not the equality symbol, and a
+       relation only under the positive sign, with 2 values. */
+    if (s->attribute != EQUALITY_SYMBOL) {
+      unsigned long long trees = (s->type == FUNCTION ?
+				  2 * (unsigned long long) Domain_size : 2);
+      unsigned long long nodes = 0;  /* width^0 + ... + width^(arity-1) */
+      unsigned long long level = 1;
+      int i;
+      for (i = 0; i < s->arity && nodes < TABLE_BYTES_MAX; i++) {
+	nodes += level;
+	level = table_mult(level, width);
+      }
+      bytes += table_mult(trees,
+			  table_mult(nodes, width * sizeof(void *)));
+      if (bytes > TABLE_BYTES_MAX)
+	bytes = TABLE_BYTES_MAX;
+    }
+  }
+  return bytes;
+}  /* negprop_index_bytes */
+
 static int mace_megs(void);
 
 /*************
@@ -575,7 +615,7 @@ static
 int init_for_domain_size(void)
 {
   int i, j, nextbase, id;
-  unsigned long long bytes;
+  unsigned long long bytes, negprop_bytes;
   Symbol_data s;
 
   /* Give each symbol its "base" value, which is used to index cells.  */
@@ -594,16 +634,22 @@ int init_for_domain_size(void)
     nextbase += cells;
   }
 
-  /* The table comes from safe_malloc(), not palloc(), so neither
-     max_megs check could see it.  Check it before allocating it. */
+  /* The tables come from safe_malloc(), not palloc(), so neither
+     max_megs check could see them.  Check them before allocating. */
 
-  bytes = cell_table_bytes();
+  negprop_bytes = (flag(Opt->negprop) ? negprop_index_bytes() : 0);
+  bytes = cell_table_bytes() + negprop_bytes;
   if (parm(Opt->max_megs) != -1 &&
       mace_megs() + (long long) (bytes / (1024*1024)) > parm(Opt->max_megs)) {
     fprintf(stderr,
             "\n%% Mace4: domain size %d needs %llu megabytes for the "
-            "cell table, over max_megs (%d)\n",
-            Domain_size, bytes / (1024*1024), parm(Opt->max_megs));
+            "cell table%s, over max_megs (%d)\n",
+            Domain_size, bytes / (1024*1024),
+            flag(Opt->negprop) ? " and negprop index" : "",
+            parm(Opt->max_megs));
+    if (negprop_bytes > bytes / 2)
+      fprintf(stderr, "%% Mace4: most of that is the negprop index, "
+              "which clear(negprop) does without\n");
     return SEARCH_MAX_MEGS;
   }
   Table_megs = (int) (bytes / (1024*1024));

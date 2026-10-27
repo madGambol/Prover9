@@ -78,6 +78,24 @@ END
 check "mace4: cell table larger than max_megs" 7 "over max_megs" \
   "$BIN/mace4" -f "$TMP/cells.in"
 
+# The negprop index is a tree of (Domain_size+1)^arity pointers per
+# value of each symbol, also from safe_calloc().  For r/15 at domain
+# size 2 it is about 330 MB, against a cell table of under 3 MB.
+cat > "$TMP/negprop.in" <<END
+assign(max_megs, 50).
+assign(max_seconds, 5).
+formulas(sos).
+r($(vars 15)).
+end_of_list.
+END
+check "mace4: negprop index larger than max_megs" 7 "negprop index" \
+  "$BIN/mace4" -f "$TMP/negprop.in"
+
+# Control: without the index the same problem fits, and has a model.
+(echo "clear(negprop)."; cat "$TMP/negprop.in") > "$TMP/no_negprop.in"
+check "mace4: same input, clear(negprop) (control)" 0 "Exiting with 1 model" \
+  "$BIN/mace4" -f "$TMP/no_negprop.in"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
