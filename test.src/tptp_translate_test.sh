@@ -152,6 +152,29 @@ mk qname.p    "fof('EQ-var',axiom, p(a) )." \
 ladr   "T5a quoted formula names: readable, proves"  qname.p   max_proofs
 native "T5b native: quoted formula names"           qname.p   Theorem
 
+# T6: TPTP's "distinct objects", written in double quotes, are pairwise
+# unequal but may equal an ordinary term.  tptp_to_ladr could not lex
+# them at all.  T6c also has them in an included file, next to comments
+# that contain quotes of both kinds.
+mk do.p       'fof(ax,axiom, p("Apple") & p("Microsoft") & p("Sun") ).' \
+              'fof(g,conjecture, "Apple" != "Microsoft" ).'
+mk dc.p       'fof(ax,axiom, p("a") & p("b") & p(cat) ).' \
+              'fof(g,conjecture, "a" != cat ).'
+mkdir "$W/ax"
+mk ax/do.ax   "% a comment that isn't a \"distinct object\"" \
+              'fof(inc,axiom, p("x") ).'
+mk doinc.p    "/* a block comment, with 'quotes' and \"quotes\" */" \
+              "include('ax/do.ax')." \
+              'fof(ax,axiom, p("a b") ).' \
+              'fof(g,conjecture, "a b" != "x" ).'
+ladr   "T6a \"Apple\" != \"Microsoft\""               do.p      max_proofs
+ladr   "T6b \"a\" != cat does not follow"             dc.p      sos_empty
+ladr   "T6c distinct objects in an included file"      doinc.p   max_proofs
+native "T6d native: \"Apple\" != \"Microsoft\""       do.p      Theorem
+native "T6e native: \"a\" != cat does not follow"     dc.p      GaveUp
+native_mace4 "T6f mace4 -tptp: \"a\" != cat"          dc.p      CounterSatisfiable
+native "T6g native: in an included file"           doinc.p   Theorem
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
