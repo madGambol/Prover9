@@ -68,6 +68,13 @@ test7:
 	@test.src/distinctness_test.sh bin/prover9
 	@echo ""
 	@echo "**** Distinctness/numeral-unification regression matrix. ****"
+	@echo "**** Next try 'make test8'. ****"
+	@echo ""
+
+test8:
+	@test.src/tptp_translate_test.sh bin
+	@echo ""
+	@echo "**** TPTP input regression matrix (tptp_to_ladr and native). ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""
