@@ -570,11 +570,15 @@ int main(int argc, char **argv)
 
       Topform c = p->v;
       if (label) {
-	char s[100];
 	/* quote it only if necessary */
 	char *q = (ordinary_constant_string(label) ? "" : "\"");
-	sprintf(s, "%s%s_%d%s", q, label, ++n, q);
+	/* label comes from the command line, so size the buffer from it:
+	   the quotes, the label, '_', an int, and the NUL */
+	size_t size = 2*strlen(q) + strlen(label) + 1 + 11 + 1;
+	char *s = safe_malloc(size);
+	snprintf(s, size, "%s%s_%d%s", q, label, ++n, q);
 	c->attributes = set_string_attribute(c->attributes, label_attr, s);
+	safe_free(s);  /* set_string_attribute() keeps its own copy */
       }
       fwrite_clause(stdout, c, CL_FORM_BARE);
     }

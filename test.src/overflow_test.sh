@@ -37,6 +37,21 @@ LONG=$(repeat 300)
 LONG600=$(repeat 600)
 LONG4000=$(repeat 4000)
 
+# A small proof for the prooftrans cases.
+cat > "$TMP/x2.in" <<'END'
+formulas(sos).
+  e * x = x.
+  x' * x = e.
+  (x * y) * z = x * (y * z).
+  x * x = e.
+end_of_list.
+
+formulas(goals).
+  x * y = y * x.
+end_of_list.
+END
+$TIMEOUT_CMD "$BIN/prover9" -f "$TMP/x2.in" > "$TMP/proof" 2>/dev/null
+
 pass=0
 fail=0
 
@@ -73,6 +88,12 @@ for prog in prooftrans directproof interpformat; do
 done
 check "mace4 -r <600-char missing directory>" 1 \
   "cannot open $LONG600/saved_input.txt" /dev/null "$BIN/mace4" -r "$LONG600"
+
+# M5: prooftrans hints -label was formatted into char[100].
+check "prooftrans hints -label <300 chars>" 0 \
+  "${LONG}_1" "$TMP/proof" "$BIN/prooftrans" hints -label "$LONG"
+check "prooftrans hints -label <300 chars, quoted>" 0 \
+  "\"a-${LONG}_1\"" "$TMP/proof" "$BIN/prooftrans" hints -label "a-$LONG"
 
 echo
 echo "$pass passed, $fail failed"
