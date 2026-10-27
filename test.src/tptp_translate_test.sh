@@ -175,6 +175,23 @@ native "T6e native: \"a\" != cat does not follow"     dc.p      GaveUp
 native_mace4 "T6f mace4 -tptp: \"a\" != cat"          dc.p      CounterSatisfiable
 native "T6g native: in an included file"           doinc.p   Theorem
 
+# T8: NAND ("~&") and NOR ("~|").  The conversion code has always been
+# there, but the parser was never told the operators exist, so every
+# problem using them failed to translate.  T8c checks both meanings in
+# both directions.
+mk nand.p     'fof(a,axiom, p(a) ~& q(b) ).' \
+              'fof(g,conjecture, ~ (p(a) & q(b)) ).'
+mk nor.p      'fof(a,axiom, p(a) ~| q(b) ).' \
+              'fof(g,conjecture, ~ (p(a) | q(b)) ).'
+mk nandnor.p  'fof(g,conjecture, ( (p ~& q) <=> ~ (p & q) )' \
+              '                  & ( (p ~| q) <=> ~ (p | q) ) ).'
+ladr   "T8a p ~& q |- ~(p & q)"                     nand.p    max_proofs
+ladr   "T8b p ~| q |- ~(p | q)"                     nor.p     max_proofs
+ladr   "T8c (p ~& q) <=> ~(p & q), same for ~|"     nandnor.p max_proofs
+native "T8d native: p ~& q |- ~(p & q)"             nand.p    Theorem
+native "T8e native: p ~| q |- ~(p | q)"             nor.p     Theorem
+native "T8f native: ~& and ~| equivalences"         nandnor.p Theorem
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

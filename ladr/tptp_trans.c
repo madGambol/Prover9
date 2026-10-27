@@ -180,6 +180,13 @@ void declare_tptp_input_types(void)
   declare_parse_type("<=>", 505, INFIX);
   declare_parse_type("<~>", 505, INFIX);
 
+  /* NAND and NOR.  tptp3_to_ladr_term() converts "~&" and "~|", but
+     the parser must be told they exist.  TPTP groups them with the
+     other non-associative connectives (<=>, =>, <=, <~>). */
+
+  declare_parse_type("~|",  505, INFIX);
+  declare_parse_type("~&",  505, INFIX);
+
   /* Other things */
 
   set_cons_char('\0');  /* Don't recognize list cons */
