@@ -122,6 +122,11 @@ END
 check "prover9 kbo_weights with a 300-char unknown symbol" 1 \
   "init_kbo_weights, symbol $LONG not found" /dev/null "$BIN/prover9" -f "$TMP/kbo.in"
 
+# T2: tptp_to_ladr cut a missing include's name at 60 characters.
+echo "include('$LONG4000')." > "$TMP/inc.p"
+check "tptp_to_ladr include('<4000-char missing file>')" 1 \
+  "read_tptp_input, file $LONG4000 not found" "$TMP/inc.p" "$BIN/tptp_to_ladr"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
