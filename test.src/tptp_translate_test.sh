@@ -77,9 +77,10 @@ text() {
 }
 
 # The exit reason prover9 or mace4 reports on stdin: max_proofs,
-# sos_empty, max_models, exhausted, max_seconds, ...
+# sos_empty, max_models, exhausted, max_seconds, ..., or fatal_error.
 reason() {
-  sed -n 's/.* exit (\([a-z_]*\)).*/\1/p' | head -n 1
+  sed -n -e 's/.* exit (\([a-z_]*\)).*/\1/p' \
+         -e 's/^Fatal error.*/fatal_error/p' | head -n 1
 }
 
 # ladr DESC FILE.p REASON -- translate, then run prover9 on the
@@ -141,6 +142,15 @@ native "T4g native: ~![X]:p(X) |- ?[X]:~p(X)"      neg2.p    Theorem
 native "T4h native: ![X]:~?[Y]:q(X,Y) |- ~q(a,b)"  negnest.p Theorem
 native "T4i native: ~![X]:p(X) |/- p(c)"           neginv.p  GaveUp
 native_mace4 "T4j mace4 -tptp: ~![X]:p(X) |/- p(c)" neginv.p CounterSatisfiable
+
+# T5: a TPTP formula name may be a single-quoted atom.  tptp_to_ladr
+# copied it into label(...) as is, but LADR quotes with ", so prover9
+# could not read the translation back.
+mk qname.p    "fof('EQ-var',axiom, p(a) )." \
+              "fof('a b',axiom, p(a) => q(a) )." \
+              'fof(g,conjecture, q(a) ).'
+ladr   "T5a quoted formula names: readable, proves"  qname.p   max_proofs
+native "T5b native: quoted formula names"           qname.p   Theorem
 
 echo
 echo "$pass passed, $fail failed"

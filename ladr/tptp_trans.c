@@ -445,6 +445,44 @@ Term tptp3_to_ladr_term(Term t)
 
 /*************
  *
+ *   ladr_quoted_name()
+ *
+ *************/
+
+/* A TPTP formula name may be a single-quoted atom, as in
+ *
+ *     fof('EQ-var', axiom, ...).
+ *
+ * TPTP quotes with ' and LADR with ", so copying such a name straight
+ * into label(...) gives a file that LADR's own reader rejects
+ * ("sread_term error" at the label).  Re-quote the name in LADR's style.
+ * Any other name is returned unchanged, and so is one whose text
+ * contains a double quote, which cannot be re-quoted this way.
+ */
+
+static
+Term ladr_quoted_name(Term name)
+{
+  if (CONSTANT(name)) {
+    char *s = sn_to_str(SYMNUM(name));
+    int n = strlen(s);
+    if (n >= 2 && s[0] == '\'' && s[n-1] == '\'' && strchr(s, '"') == NULL) {
+      char *q = safe_malloc(n+1);
+      Term new_name;
+      q[0] = '"';
+      memcpy(q+1, s+1, n-2);
+      q[n-1] = '"';
+      q[n] = '\0';
+      new_name = get_rigid_term(q, 0);
+      safe_free(q);
+      return new_name;
+    }
+  }
+  return copy_term(name);
+}  /* ladr_quoted_name */
+
+/*************
+ *
  *   tptp_input_to_ladr_formula()
  *
  *   The input Term t is not modified by the call.
@@ -475,7 +513,7 @@ Formula tptp_input_to_ladr_formula(Term t)
   }
 
   a = build_binary_term_safe(attrib_sym(),
-			     build_unary_term_safe("label", copy_term(name)),
+			     build_unary_term_safe("label", ladr_quoted_name(name)),
 			     build_unary_term_safe("label", copy_term(role)));
   b = build_binary_term_safe(attrib_sym(), form, a);
   f = term_to_formula(b);
