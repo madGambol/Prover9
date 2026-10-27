@@ -96,6 +96,13 @@ test11:
 	@test.src/memory_safety_test.sh bin/prover9
 	@echo ""
 	@echo "**** Memory-safety checks.  SKIP means the tool a case needs is unavailable. ****"
+	@echo "**** Next try 'make test12'. ****"
+	@echo ""
+
+test12:
+	@test.src/option_parsing_test.sh bin/prover9
+	@echo ""
+	@echo "**** Option-dependency checks. ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""
