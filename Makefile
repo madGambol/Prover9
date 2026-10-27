@@ -110,6 +110,13 @@ test13:
 	@test.src/memory_limit_test.sh bin
 	@echo ""
 	@echo "**** max_megs regression cases. ****"
+	@echo "**** Next try 'make test14'. ****"
+	@echo ""
+
+test14:
+	@test.src/helper_scripts_test.sh bin
+	@echo ""
+	@echo "**** If all pass, the helper scripts in ./bin are okay. ****"
 	@echo ""
 	@echo "*** All of the programs are in ./bin, and they can be copied anywhere you like. ***"
 	@echo ""
